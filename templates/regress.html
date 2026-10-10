@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Предсказание массы пингвина</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        h1 { color: #333; }
+        label { display: block; margin-top: 15px; font-weight: bold; }
+        input, select { width: 100%; padding: 8px; margin-top: 5px; font-size: 16px;
+                        box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; }
+        button { margin-top: 20px; padding: 12px 24px; font-size: 16px; background: #4a90d9;
+                 color: white; border: none; border-radius: 6px; cursor: pointer; }
+        button:hover { background: #357ab8; }
+        .result { margin-top: 25px; padding: 20px; background: #e8f0fa; border-left: 5px solid #4a90d9;
+                  border-radius: 5px; }
+        .result h2 { margin-top: 0; color: #1e5a99; }
+        .back { display: inline-block; margin-top: 20px; color: #4a90d9; text-decoration: none; }
+        .hint { font-size: 12px; color: #888; font-weight: normal; margin-top: 3px; }
+    </style>
+</head>
+<body>
+    <h1>Предсказание массы пингвина</h1>
+
+    <form method="post">
+        <label>Длина клюва (мм):
+            <input type="number" step="0.1" name="bill_length" required
+                   min="30" max="65" value="{{ form.bill_length or '' }}">
+            <div class="hint">от 30 до 65 мм</div>
+        </label>
+        <label>Толщина клюва (мм):
+            <input type="number" step="0.1" name="bill_depth" required
+                   min="12" max="25" value="{{ form.bill_depth or '' }}">
+            <div class="hint">от 12 до 25 мм</div>
+        </label>
+        <label>Длина ласта (мм):
+            <input type="number" step="1" name="flipper_length" required
+                   min="160" max="240" value="{{ form.flipper_length or '' }}">
+            <div class="hint">от 160 до 240 мм</div>
+        </label>
+        <label>Пол:
+            <select name="sex" required>
+                <option value="male">Самец</option>
+                <option value="female">Самка</option>
+            </select>
+        </label>
+        <button type="submit">Предсказать массу</button>
+    </form>
+
+    {% if result %}
+    <div class="result">
+        <h2>Масса: {{ result.mass_g }} г</h2>
+    </div>
+    {% endif %}
+
+    <a class="back" href="/">← На главную</a>
+</body>
+</html>
