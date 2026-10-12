@@ -5,10 +5,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 
-# ============ НЕЙРОННАЯ СЕТЬ (та же, что в Colab) ============
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
-
 
 class Neuron:
     def __init__(self, input_size, activation="sigmoid"):
@@ -41,12 +39,11 @@ class SimpleNeuralNetwork:
         return float(out[0])
 
 
-# ============ ЗАГРУЗКА МОДЕЛЕЙ ИЗ JSON ============
 def load_network(path):
     with open(path, encoding="utf-8") as f:
         saved = json.load(f)
 
-    arch = saved["architecture"]   # [5, 8, 3] или [5, 8, 1]
+    arch = saved["architecture"]
     activation = "sigmoid" if arch[2] > 1 else "linear"
 
     net = SimpleNeuralNetwork(arch[0], arch[1], arch[2], output_activation=activation)
@@ -64,12 +61,12 @@ def load_network(path):
 net_cls, meta_cls = load_network("classification_weights.json")
 net_reg, meta_reg = load_network("regression_weights.json")
 
-# Общие параметры нормализации
+
 MN = np.array(meta_cls["mn"])
 MX = np.array(meta_cls["mx"])
 CLASS_NAMES = meta_cls["classes"]
 
-# Параметры нормализации массы
+
 MASS_MN = meta_reg["mass_mn"]
 MASS_MX = meta_reg["mass_mx"]
 
@@ -77,7 +74,6 @@ print("Модели загружены.")
 print("Классы:", CLASS_NAMES)
 
 
-# ============ FASTAPI ============
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
