@@ -1,10 +1,8 @@
-import os
 import json
 import numpy as np
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-import uvicorn
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
