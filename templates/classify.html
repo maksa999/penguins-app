@@ -25,17 +25,17 @@
     <form method="post">
         <label>Длина клюва (мм):
             <input type="number" step="0.1" name="bill_length" required
-                   min="30" max="65" value="{{ form.bill_length or '' }}">
+                   min="30" max="65">
             <div class="hint">от 30 до 65 мм</div>
         </label>
         <label>Толщина клюва (мм):
             <input type="number" step="0.1" name="bill_depth" required
-                   min="12" max="25" value="{{ form.bill_depth or '' }}">
+                   min="12" max="25">
             <div class="hint">от 12 до 25 мм</div>
         </label>
         <label>Длина ласта (мм):
             <input type="number" step="1" name="flipper_length" required
-                   min="160" max="240" value="{{ form.flipper_length or '' }}">
+                   min="160" max="240">
             <div class="hint">от 160 до 240 мм</div>
         </label>
         <label>Пол:
@@ -47,15 +47,9 @@
         <button type="submit">Определить вид</button>
     </form>
 
-    {% if result %}
+    {% if prediction %}
     <div class="result">
-        <h2>Вид: {{ result.species }}</h2>
-        <p>Вероятности:</p>
-        <ul>
-            {% for name, p in result.probs.items() %}
-            <li>{{ name }}: {{ p }}</li>
-            {% endfor %}
-        </ul>
+        <h2>Вид: {{ prediction }}</h2>
     </div>
     {% endif %}
 

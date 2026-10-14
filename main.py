@@ -4,90 +4,91 @@ from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+app = FastAPI()
+templates = Jinja2Templates(directory="templates")
 
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
 class Neuron:
-    def __init__(self, input_size, activation="sigmoid"):
-        self.weights = np.random.uniform(-1, 1, input_size)
-        self.bias = np.random.uniform(-1, 1)
-        self.activation = activation
+    def __init__(self, weights, bias):
+        self.weights = np.array(weights)
+        self.bias = bias
 
     def feedforward(self, inputs):
-        total = np.dot(inputs, self.weights) + self.bias
-        return sigmoid(total) if self.activation == "sigmoid" else total
+        return sigmoid(np.dot(inputs, self.weights) + self.bias)
 
+class NeuronLinear:
+    def __init__(self, weights, bias):
+        self.weights = np.array(weights)
+        self.bias = bias
 
-class SimpleNeuralNetwork:
-    def __init__(self, input_size, hidden_size, output_size, output_activation="sigmoid"):
-        self.hidden_layer = [Neuron(input_size) for _ in range(hidden_size)]
-        self.output_layer = [Neuron(hidden_size, activation=output_activation)
-                             for _ in range(output_size)]
+    def feedforward(self, inputs):
+        return np.dot(inputs, self.weights) + self.bias
+
+class ClassificationNetwork:
+    def __init__(self, data):
+        self.hidden_layer = [Neuron(n["weights"], n["bias"]) for n in data["hidden"]]
+        self.output_layer = [Neuron(n["weights"], n["bias"]) for n in data["output"]]
+        self.mn = np.array(data["mn"])
+        self.mx = np.array(data["mx"])
+        self.names = data["names"]
 
     def feedforward(self, inputs):
         hidden = np.array([n.feedforward(inputs) for n in self.hidden_layer])
-        outputs = np.array([n.feedforward(hidden) for n in self.output_layer])
-        return hidden, outputs
+        return np.array([n.feedforward(hidden) for n in self.output_layer])
 
     def predict(self, inputs):
-        _, out = self.feedforward(inputs)
-        return int(np.argmax(out))
-
-    def predict_value(self, inputs):
-        _, out = self.feedforward(inputs)
-        return float(out[0])
+        x = (inputs - self.mn) / (self.mx - self.mn)
+        outputs = self.feedforward(x)
+        return self.names[int(np.argmax(outputs))]
 
 
-def load_network(path):
-    with open(path, encoding="utf-8") as f:
-        saved = json.load(f)
+class RegressionNetwork:
+    def __init__(self, data):
+        self.hidden_layer = [Neuron(n["weights"], n["bias"]) for n in data["hidden"]]
+        self.output_neuron = NeuronLinear(
+            data["output"]["weights"],
+            data["output"]["bias"],
+        )
+        self.mn = np.array(data["mn"])
+        self.mx = np.array(data["mx"])
+        self.ymn = data["ymn"]
+        self.ymx = data["ymx"]
 
-    arch = saved["architecture"]
-    activation = "sigmoid" if arch[2] > 1 else "linear"
+    def feedforward(self, inputs):
+        hidden = np.array([n.feedforward(inputs) for n in self.hidden_layer])
+        return self.output_neuron.feedforward(hidden)
 
-    net = SimpleNeuralNetwork(arch[0], arch[1], arch[2], output_activation=activation)
+    def predict(self, inputs):
+        x = (inputs - self.mn) / (self.mx - self.mn)
+        y_n = self.feedforward(x)
+        return y_n * (self.ymx - self.ymn) + self.ymn
 
-    for neuron, params in zip(net.hidden_layer, saved["hidden"]):
-        neuron.weights = np.array(params["weights"])
-        neuron.bias = params["bias"]
-    for neuron, params in zip(net.output_layer, saved["output"]):
-        neuron.weights = np.array(params["weights"])
-        neuron.bias = params["bias"]
+with open("classification_weights.json", "r", encoding="utf-8") as f:
+    clf = ClassificationNetwork(json.load(f))
 
-    return net, saved
-
-
-net_cls, meta_cls = load_network("classification_weights.json")
-net_reg, meta_reg = load_network("regression_weights.json")
-
-
-MN = np.array(meta_cls["mn"])
-MX = np.array(meta_cls["mx"])
-CLASS_NAMES = meta_cls["classes"]
-
-
-MASS_MN = meta_reg["mass_mn"]
-MASS_MX = meta_reg["mass_mx"]
+with open("regression_weights.json", "r", encoding="utf-8") as f:
+    reg = RegressionNetwork(json.load(f))
 
 print("Модели загружены.")
-print("Классы:", CLASS_NAMES)
-
-
-app = FastAPI()
-templates = Jinja2Templates(directory="templates")
-
+print("Классы:", clf.names)
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    return templates.TemplateResponse(request, "index.html", {})
-
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        context={},
+    )
 
 @app.get("/classify", response_class=HTMLResponse)
-def classify_form(request: Request):
-    return templates.TemplateResponse(request, "classify.html",
-                                      {"result": None, "form": {}})
-
+def classify_get(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="classify.html",
+        context={"prediction": None},
+    )
 
 @app.post("/classify", response_class=HTMLResponse)
 def classify_post(
@@ -100,26 +101,22 @@ def classify_post(
     is_male = 1.0 if sex == "male" else 0.0
     is_female = 1.0 if sex == "female" else 0.0
 
-    x = np.array([bill_length, bill_depth, flipper_length, is_male, is_female])
-    x_norm = (x - MN) / (MX - MN)
+    features = np.array([bill_length, bill_depth, flipper_length, is_male, is_female])
+    prediction = clf.predict(features)
 
-    _, probs = net_cls.feedforward(x_norm)
-    idx = int(np.argmax(probs))
-    result = {
-        "species": CLASS_NAMES[idx],
-        "probs": {CLASS_NAMES[i]: round(float(probs[i]), 3) for i in range(len(CLASS_NAMES))},
-    }
-    form = {"bill_length": bill_length, "bill_depth": bill_depth,
-            "flipper_length": flipper_length, "sex": sex}
-    return templates.TemplateResponse(request, "classify.html",
-                                      {"result": result, "form": form})
-
+    return templates.TemplateResponse(
+        request=request,
+        name="classify.html",
+        context={"prediction": prediction},
+    )
 
 @app.get("/regress", response_class=HTMLResponse)
-def regress_form(request: Request):
-    return templates.TemplateResponse(request, "regress.html",
-                                      {"result": None, "form": {}})
-
+def regress_get(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="regress.html",
+        context={"prediction": None},
+    )
 
 @app.post("/regress", response_class=HTMLResponse)
 def regress_post(
@@ -132,14 +129,11 @@ def regress_post(
     is_male = 1.0 if sex == "male" else 0.0
     is_female = 1.0 if sex == "female" else 0.0
 
-    x = np.array([bill_length, bill_depth, flipper_length, is_male, is_female])
-    x_norm = (x - MN) / (MX - MN)
+    features = np.array([bill_length, bill_depth, flipper_length, is_male, is_female])
+    prediction = reg.predict(features)
 
-    mass_norm = net_reg.predict_value(x_norm)
-    mass_g = mass_norm * (MASS_MX - MASS_MN) + MASS_MN
-
-    result = {"mass_g": round(float(mass_g), 1)}
-    form = {"bill_length": bill_length, "bill_depth": bill_depth,
-            "flipper_length": flipper_length, "sex": sex}
-    return templates.TemplateResponse(request, "regress.html",
-                                      {"result": result, "form": form})
+    return templates.TemplateResponse(
+        request=request,
+        name="regress.html",
+        context={"prediction": round(float(prediction), 2)},
+    )
