@@ -1,8 +1,10 @@
+import os
 import json
 import numpy as np
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+import uvicorn
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -42,7 +44,6 @@ class ClassificationNetwork:
         x = (inputs - self.mn) / (self.mx - self.mn)
         outputs = self.feedforward(x)
         return self.names[int(np.argmax(outputs))]
-
 
 class RegressionNetwork:
     def __init__(self, data):
@@ -87,7 +88,7 @@ def classify_get(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="classify.html",
-        context={"prediction": None},
+        context={"prediction": None, "form": None},
     )
 
 @app.post("/classify", response_class=HTMLResponse)
@@ -104,10 +105,17 @@ def classify_post(
     features = np.array([bill_length, bill_depth, flipper_length, is_male, is_female])
     prediction = clf.predict(features)
 
+    form = {
+        "bill_length": bill_length,
+        "bill_depth": bill_depth,
+        "flipper_length": flipper_length,
+        "sex": sex,
+    }
+
     return templates.TemplateResponse(
         request=request,
         name="classify.html",
-        context={"prediction": prediction},
+        context={"prediction": prediction, "form": form},
     )
 
 @app.get("/regress", response_class=HTMLResponse)
@@ -115,7 +123,7 @@ def regress_get(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="regress.html",
-        context={"prediction": None},
+        context={"prediction": None, "form": None},
     )
 
 @app.post("/regress", response_class=HTMLResponse)
@@ -132,8 +140,15 @@ def regress_post(
     features = np.array([bill_length, bill_depth, flipper_length, is_male, is_female])
     prediction = reg.predict(features)
 
+    form = {
+        "bill_length": bill_length,
+        "bill_depth": bill_depth,
+        "flipper_length": flipper_length,
+        "sex": sex,
+    }
+
     return templates.TemplateResponse(
         request=request,
         name="regress.html",
-        context={"prediction": round(float(prediction), 2)},
+        context={"prediction": round(float(prediction), 1), "form": form},
     )
